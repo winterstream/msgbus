@@ -9,7 +9,7 @@ import pytrie
 
 import asyncloop
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig()
 
 
 class ClientSession(asynchat.async_chat):
@@ -17,6 +17,7 @@ class ClientSession(asynchat.async_chat):
         asynchat.async_chat.__init__(self, conn)
         self.server = server
         self.address = address
+        self.listening = False
 
         self.buffer = cStringIO.StringIO()
         self.current_state = self.reset(self.state_command, '\n')
@@ -34,7 +35,6 @@ class ClientSession(asynchat.async_chat):
             self.current_state = self.state_command
 
     def reset(self, new_state, terminator):
-        logging.debug("Resetting with terminator '{0}'".format(terminator))
         self.buffer.reset()
         self.buffer.truncate()
         self.set_terminator(terminator)
@@ -49,6 +49,7 @@ class ClientSession(asynchat.async_chat):
 
         if command == 'send':
             buffer_size = int(lexer.next())
+            self.push('ack send\n'.format(buffer_size))
             return self.reset(partial(self.state_send, lexer), buffer_size)
         elif command == 'sub':
             new_subscriptions = set(lexer)
@@ -61,9 +62,15 @@ class ClientSession(asynchat.async_chat):
             self.server.unsubscribe(subscriptions_to_remove, self)
             self.push('ack unsub\n')
         elif command == 'error':
-            print buf
+            logging.debug('Received error from client {0}: {1}'.format(self.address, buf))
         elif command == 'ping':
             self.push('pong\n')
+        elif command == 'listen':
+            self.listening = True
+            self.push('ack listen\n')
+        elif command == 'unlisten':
+            self.listening = False
+            self.push('ack unlisten\n')
         else:
             self.push('error Received invalid command: {0}\n'.format(command))
 
@@ -72,10 +79,13 @@ class ClientSession(asynchat.async_chat):
     def state_send(self, addresses):
         logging.debug('Processing send')
         self.server.deliver(self, addresses, self.buffer.getvalue())
+        self.push('ack send\n')
         return self.reset(self.state_command, '\n')
 
     def deliver(self, buf):
-        self.push_with_producer(asynchat.simple_producer(buf))
+        if self.listening:
+            self.push('recv {0}\n'.format(len(buf)))
+            self.push_with_producer(asynchat.simple_producer(buf))
 
     def handle_close(self):
         self.server.remove_client(self)
