@@ -80,3 +80,8 @@ If the client sends an invalid command, the server responds with the line:
 ``error xxx\n``
 where ``xxx`` is an error message (without newlines).
 
+Acknowledgements
+----------------
+
+[George Sakkis](https://bitbucket.org/gsakkis) for his trie implementation,
+[PyTrie](https://pypi.python.org/pypi/PyTrie).
