@@ -33,8 +33,6 @@ import logging
 from functools import partial
 import pytrie
 
-import asyncloop
-
 logging.basicConfig()
 
 
@@ -168,4 +166,4 @@ class Server(asyncore.dispatcher):
 
 if __name__ == '__main__':
     server = Server(11111)
-    asyncloop.loop()
+    asyncore.loop()
